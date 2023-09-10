@@ -30,6 +30,8 @@ public class ChessMatch {
 		board = new Board(8,8);
 		turn = 1;
 		currentPlayer = Color.WHITE;
+		checkmate = false;
+		check = false;
 		initialSetup();
 	}
 	
@@ -84,12 +86,18 @@ public class ChessMatch {
 			throw new ChessException("You can't put yourself in check");
 		}
 		check = (testCheck(opponent(currentPlayer))) ? true : false;
-		nextTurn();
+		if(testCheckMate(opponent(currentPlayer))) {
+			checkmate = true;
+		} else {
+			nextTurn();
+		}
+		
 		return (ChessPiece)capturedPiece;
 	}
 	
 	private Piece makeMove(Position source, Position target) {
-		Piece p = board.removePiece(source);
+		ChessPiece p = (ChessPiece)board.removePiece(source);
+		p.increaseMoveCount();
 		Piece capturedPiece = board.removePiece(target);
 		board.placePiece(p, target);
 		
@@ -101,7 +109,8 @@ public class ChessMatch {
 	}
 	
 	private void undoMove(Position source, Position target, Piece capturedPiece) {
-		Piece p = board.removePiece(target);
+		ChessPiece p = (ChessPiece)board.removePiece(target);
+		p.decreaseMoveCount();
 		board.placePiece(p, source);
 		
 		if (capturedPiece != null) {
@@ -162,6 +171,35 @@ public class ChessMatch {
 			}
 		}
 		return false;
+	}
+	
+	private boolean testCheckMate(Color color) {
+		if (!testCheck(color)) {
+			return false;
+		}
+		List<Piece> list = piecesOnTheBoard.stream()
+				.filter(x ->((ChessPiece)x).getColor() == color)
+				.collect(Collectors.toList());
+		for(Piece p : list) {
+			boolean[][] mat = p.possibleMoves();
+			for(int i = 0; i< board.getRows(); i++) {
+				for(int j = 0; j< board.getColumns(); j++) {
+					if(mat[i][j]) {
+						Position source = ((ChessPiece)p).getChessPosition().toPosition();
+						Position target = new Position(i, j);
+						Piece capturedPiece = makeMove(source, target);
+						boolean testCheck = testCheck(color);
+						undoMove(source, target, capturedPiece);
+						if(!testCheck) {
+							return false;
+						}
+					}
+						
+				}
+			}
+				
+		}
+		return true;
 	}
 	
 	private void placeNewPiece(char column, int row, ChessPiece piece) {
